@@ -244,6 +244,52 @@ public final class HddsUtils {
   }
 
   /**
+   * Parse a Ratis role string produced by
+   * {@code SCMRatisServerImpl.getRatisRoles()} into its constituent fields.
+   * The format is {@code [host]:port:ROLE:id:hostIP} where host and hostIP
+   * may be bracketed IPv6 literals.
+   *
+   * @param roleString the encoded role string
+   * @return a 5-element array: {host, port, role, id, hostIP}
+   */
+  public static String[] parseRatisRoleString(String roleString) {
+    // Parse from the right: the last field is hostIP (possibly bracketed),
+    // then id (uuid, no colons), then role (LEADER/FOLLOWER, no colons),
+    // and the remainder is host:port (which may be bracketed IPv6).
+    int idx = roleString.length();
+
+    // Field 5: hostIP — may be bracketed IPv6 like [2001:db8::1]
+    String hostIp;
+    if (idx > 0 && roleString.charAt(idx - 1) == ']') {
+      int bracket = roleString.lastIndexOf('[');
+      hostIp = roleString.substring(bracket + 1, idx - 1);
+      idx = bracket - 1; // skip the ':' before '['
+    } else {
+      int sep = roleString.lastIndexOf(':');
+      hostIp = roleString.substring(sep + 1);
+      idx = sep;
+    }
+
+    // Field 4: id (uuid or peer id, no colons)
+    int sep3 = roleString.lastIndexOf(':', idx - 1);
+    String id = roleString.substring(sep3 + 1, idx);
+    idx = sep3;
+
+    // Field 3: role (LEADER/FOLLOWER, no colons)
+    int sep2 = roleString.lastIndexOf(':', idx - 1);
+    String role = roleString.substring(sep2 + 1, idx);
+    idx = sep2;
+
+    // Remainder is host:port — use HostAndPort to parse safely
+    String hostPort = roleString.substring(0, idx);
+    HostAndPort hp = HostAndPort.fromString(hostPort);
+    String host = hp.getHost();
+    String port = String.valueOf(hp.getPort());
+
+    return new String[]{host, port, role, id, hostIp};
+  }
+
+  /**
    * Retrieve a number, trying the supplied config keys in order.
    * Each config value may be absent
    *

@@ -289,13 +289,24 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         LOG.error("SCM Ratis PeerInetAddress {} is unresolvable",
             peer.getAddress());
       }
-      ratisRoles.add((peer.getAddress() == null ? "" :
-          peer.getAddress().concat(peer.equals(leader) ?
-                  ":".concat(RaftProtos.RaftPeerRole.LEADER.toString()) :
-                  ":".concat(RaftProtos.RaftPeerRole.FOLLOWER.toString()))
-                  .concat(":".concat(peer.getId().toString()))
-                  .concat(":".concat(peerInetAddress == null ? "" :
-                      peerInetAddress.getHostAddress()))));
+      if (peer.getAddress() == null) {
+        ratisRoles.add("");
+        continue;
+      }
+      String host = HddsUtils.getHostName(peer.getAddress()).orElse("");
+      int port = HddsUtils.getHostPort(peer.getAddress()).orElse(0);
+      String normalizedAddress = HddsUtils.getHostPortString(host, port);
+      String role = peer.equals(leader)
+          ? RaftProtos.RaftPeerRole.LEADER.toString()
+          : RaftProtos.RaftPeerRole.FOLLOWER.toString();
+      String hostIp = "";
+      if (peerInetAddress != null) {
+        String rawIp = peerInetAddress.getHostAddress();
+        hostIp = rawIp.contains(":") ? "[" + rawIp + "]" : rawIp;
+      }
+      String roleEntry = normalizedAddress + ":" + role + ":"
+          + peer.getId().toString() + ":" + hostIp;
+      ratisRoles.add(roleEntry);
     }
     return ratisRoles;
   }
